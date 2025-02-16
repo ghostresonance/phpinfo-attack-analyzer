@@ -359,20 +359,138 @@ def generate_config_attack_mapping(config):
     
     return mapping
 
+def test_file_upload_tmp_disclosure(target_url):
+    """
+    Test if phpinfo() page discloses temporary file upload paths by sending a test file
+    and analyzing the response.
+    
+    Returns:
+        tuple: (bool, str) - (is_disclosed, tmp_path_or_error)
+    """
+    try:
+        # Create test file with unique content
+        test_content = f"phpinfo_test_{os.urandom(4).hex()}"
+        files = {'test': ('test.txt', test_content)}
+        
+        # Send POST request with test file
+        response = requests.post(target_url, files=files, timeout=10)
+        
+        if response.status_code != 200:
+            return False, "Failed to get phpinfo response"
+            
+        # Look for our test file in $_FILES array
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Find $_FILES table - check both table headers and content
+        files_table = None
+        for table in soup.find_all('table'):
+            table_text = str(table)
+            if '_FILES' in table_text or 'tmp_name' in table_text:
+                files_table = table
+                break
+                
+        if not files_table:
+            # Try finding it in the raw HTML if BeautifulSoup didn't catch it
+            if 'tmp_name' in response.text and '/tmp/php' in response.text:
+                # Extract using regex
+                tmp_match = re.search(r'/tmp/php\w{6}', response.text)
+                if tmp_match:
+                    return True, re.sub(r'\w{6}$', 'XXXXXX', tmp_match.group(0))
+            return False, "No $_FILES table found in phpinfo output"
+            
+        # Look for [tmp_name] pattern and /tmp/php pattern
+        for row in files_table.find_all('tr'):
+            cells = row.find_all(['td', 'th'])
+            if len(cells) >= 2:
+                cell_text = cells[0].get_text()
+                if '[tmp_name]' in cell_text or 'tmp_name' in cell_text:
+                    tmp_path = cells[1].get_text().strip()
+                    if tmp_path and '/tmp/php' in tmp_path:
+                        # Extract pattern from actual path (e.g., /tmp/phpXXXXXX)
+                        pattern = re.sub(r'[a-zA-Z0-9]{6}$', 'XXXXXX', tmp_path)
+                        return True, pattern
+                        
+        # One final check in the raw HTML
+        if '/tmp/php' in response.text:
+            tmp_match = re.search(r'/tmp/php\w{6}', response.text)
+            if tmp_match:
+                return True, re.sub(r'\w{6}$', 'XXXXXX', tmp_match.group(0))
+                
+        return False, "No temporary file path found in $_FILES table"
+        
+    except Exception as e:
+        return False, f"Error testing file upload: {str(e)}"
+
+def check_phpinfo_lfi_conditions(config, streams, target_url):
+    """
+    Check conditions for PHPInfo LFI race condition vulnerability.
+    Returns (is_vulnerable, reasons, tmp_pattern)
+    """
+    conditions = {
+        "file_uploads": False,
+        "file_stream": False,
+        "tmp_disclosure": False
+    }
+    reasons = []
+    tmp_pattern = None
+    
+    # Check file uploads enabled
+    if config.get("file_uploads", "").lower() == "on":
+        conditions["file_uploads"] = True
+    else:
+        reasons.append("File uploads are disabled")
+    
+    # Check file stream wrapper
+    if "file" in streams:
+        conditions["file_stream"] = True
+    else:
+        reasons.append("File stream wrapper is not available")
+    
+    # Test temporary file disclosure
+    if conditions["file_uploads"]:
+        is_disclosed, tmp_result = test_file_upload_tmp_disclosure(target_url)
+        conditions["tmp_disclosure"] = is_disclosed
+        if is_disclosed:
+            tmp_pattern = tmp_result
+        else:
+            reasons.append(f"Temporary file disclosure test failed: {tmp_result}")
+    
+    is_vulnerable = all(conditions.values())
+    
+    return is_vulnerable, reasons, tmp_pattern
+
+def generate_phpinfo_lfi_suggestions(config, target_url, tmp_pattern):
+    """
+    Generate exploitation suggestions for PHPInfo LFI vulnerability
+    """
+    suggestions = []
+    suggestions.append(f"{Fore.LIGHTRED_EX}[!] CRITICAL: PHPINFO LFI RACE CONDITION VULNERABILITY DETECTED{Style.RESET_ALL}")
+    suggestions.append("Reference: https://insomniasec.com/downloads/publications/LFI%20With%20PHPInfo%20Assistance.pdf")
+    suggestions.append("")
+    
+    suggestions.append("Confirmed Vulnerability Requirements:")
+    suggestions.append("✓ PHPInfo page accessible and disclosing upload information")
+    suggestions.append("✓ File uploads enabled")
+    suggestions.append("✓ File stream wrapper available")
+    suggestions.append(f"✓ Temporary file pattern: {tmp_pattern}")
+    suggestions.append("")
+    
+    
+    return suggestions
+
 def generate_exploitation_suggestions(config, streams, target_url):
     """
     Generate focused exploitation suggestions ordered by likelihood of success and impact.
-    Order priority:
-    1. File Upload (direct code execution)
-    2. LFI/File Stream (reliable, common)
-    3. PHP Stream attacks (if available)
-    4. Data Stream (requires specific conditions)
-    5. SSRF (environment dependent)
-    6. Compression attacks (more complex)
-    7. FTP (requires external setup)
     """
     suggestions = []
-
+    
+    # Check for PHPInfo LFI vulnerability first (highest impact if present)
+    is_phpinfo_lfi_vulnerable, reasons, tmp_pattern = check_phpinfo_lfi_conditions(config, streams, target_url)
+    
+    if is_phpinfo_lfi_vulnerable:
+        suggestions.extend(generate_phpinfo_lfi_suggestions(config, target_url, tmp_pattern))
+        suggestions.append("")  # Add spacing
+    
     # 1. File Upload (if enabled) - Most direct path to RCE
     if config.get("file_uploads", "").lower() == "on":
         suggestions.append(f"{Fore.LIGHTCYAN_EX}[+] FILE UPLOAD ATTACKS{Style.RESET_ALL}")
@@ -385,7 +503,7 @@ def generate_exploitation_suggestions(config, streams, target_url):
         suggestions.append("3. Upload attempts:")
         max_size = config.get("upload_max_filesize", "2M")
         suggestions.append(f"     curl -F 'file=@shell.php' -F 'submit=1' '{target_url}'")
-        suggestions.append(f"     # Ensure file size is under found Max File Size: {max_size}")
+        suggestions.append(f"     # Adjust file size to be under {max_size}")
         suggestions.append("")
 
     # 2. File Stream/LFI - Very common, often successful
@@ -560,7 +678,7 @@ def generate_markdown_report(config, attacks, config_mapping, stream_messages, s
 
 ### OUTPUT FUNCTION ###
 
-def print_and_save_output(config, attacks, config_mapping, stream_messages, stream_attack_paths, suggestions, output_filename, markdown_filename):
+def print_and_save_output(config, attacks, config_mapping, stream_messages, stream_attack_paths, suggestions, output_filename, markdown_filename, streams, target_url):
     """
     Print the analysis results with colorized output and save two files:
     one plain-text report (with ANSI colors) and one Markdown report (without ANSI colors).
@@ -575,13 +693,29 @@ def print_and_save_output(config, attacks, config_mapping, stream_messages, stre
         print(line)
         lines.append(f"  {key}: {value}")
 
+    # --- PHPInfo LFI Check Results ---
+    is_phpinfo_lfi_vulnerable, reasons, tmp_pattern = check_phpinfo_lfi_conditions(config, streams, target_url)
+    print(f"\n{Fore.CYAN}[+] PHPInfo LFI Vulnerability Check:")
+    lines.append("\n[+] PHPInfo LFI Vulnerability Check:")
+    if is_phpinfo_lfi_vulnerable:
+        print(f"{Fore.LIGHTRED_EX}[!] VULNERABLE: PHPInfo LFI Race Condition possible!")
+        print(f"[+] Temporary file pattern: {tmp_pattern}{Style.RESET_ALL}")
+        lines.append("[!] VULNERABLE: PHPInfo LFI Race Condition possible!")
+        lines.append(f"[+] Temporary file pattern: {tmp_pattern}")
+    else:
+        print(f"{Fore.GREEN}[+] Not vulnerable to PHPInfo LFI")
+        for reason in reasons:
+            print(f"    - {reason}")
+        lines.append("[+] Not vulnerable to PHPInfo LFI")
+        for reason in reasons:
+            lines.append(f"    - {reason}")
+
     # --- Overall Potential Attack Paths ---
     print(f"\n{Fore.BLUE}[+] Overall Potential Attack Paths:")
     lines.append("\n[+] Overall Potential Attack Paths:")
     for attack in attacks:
-        plain_attack = attack  # includes ANSI color codes
         print(f" - {Fore.BLUE}{attack}{Style.RESET_ALL}")
-        lines.append(" - " + plain_attack)
+        lines.append(" - " + attack)
 
     # --- Configuration-based Attack Vectors ---
     print(f"\n{Fore.CYAN}[+] Configuration-based Attack Vectors:")
@@ -597,14 +731,14 @@ def print_and_save_output(config, attacks, config_mapping, stream_messages, stre
     print(f"\n{Fore.CYAN}[+] Registered PHP Streams Analysis:")
     lines.append("\n[+] Registered PHP Streams Analysis:")
     for message in stream_messages:
-        print(f" - {Fore.LIGHTCYAN_EX}{message}{Style.RESET_ALL}")
+        print(f" - {message}")
         lines.append(" - " + message)
 
     # --- Registered Streams Attack Vectors ---
     print(f"\n{Fore.CYAN}[+] Registered Streams Attack Vectors:")
     lines.append("\n[+] Registered Streams Attack Vectors:")
     for msg in stream_attack_paths:
-        print(f" - {msg}{Style.RESET_ALL}")
+        print(f" - {msg}")
         lines.append(" - " + msg)
 
     # --- Exploitation Test Suggestions ---
@@ -614,7 +748,7 @@ def print_and_save_output(config, attacks, config_mapping, stream_messages, stre
         print(f" - {suggestion}")
         lines.append(" - " + suggestion)
 
-    # Save the colored plain-text output.
+    # Save the colored plain-text output
     try:
         with open(output_filename, "w") as f:
             for l in lines:
@@ -623,7 +757,7 @@ def print_and_save_output(config, attacks, config_mapping, stream_messages, stre
     except Exception as e:
         print(f"{Fore.RED}[ERROR] Could not save plain-text output: {e}")
     
-    # Generate Markdown report.
+    # Generate and save Markdown report
     md_report = generate_markdown_report(config, attacks, config_mapping, stream_messages, stream_attack_paths, suggestions)
     try:
         with open(markdown_filename, "w") as f:
@@ -656,7 +790,12 @@ def main():
         print(f"{Fore.RED}[!] No configuration data found. The phpinfo() page may have an unexpected format.")
         sys.exit(1)
 
-    # Generate overall potential attack paths.
+    # Parse registered streams
+    streams = robust_parse_registered_streams(html)
+    stream_messages = analyze_streams(streams)
+    stream_attack_paths = generate_stream_attack_paths(streams)
+
+    # Generate overall potential attack paths
     attacks = []
     if "PHP_Version" in config:
         try:
@@ -668,32 +807,12 @@ def main():
         vuln_message = check_known_vulnerable_version(config["PHP_Version"])
         if vuln_message:
             attacks.append(f"{Fore.RED}Priority: Detected known vulnerable PHP version {config['PHP_Version']} – {vuln_message}{Style.RESET_ALL}")
-    if "allow_url_fopen" in config and config["allow_url_fopen"].lower() == "on":
-        attacks.append("allow_url_fopen is enabled – may allow LFI/RFI attacks.")
-    if "open_basedir" in config and config["open_basedir"].strip().lower() in ["", "no value", "none"]:
-        attacks.append("open_basedir is not set – increased risk for LFI.")
-    if "disable_functions" in config:
-        dangerous_funcs = {"exec", "system", "shell_exec", "passthru", "eval", "assert"}
-        if config["disable_functions"].strip().lower() in ["", "no value"]:
-            attacks.append("No dangerous functions are disabled – potential for command execution.")
-        else:
-            disabled = {f.strip().lower() for f in config["disable_functions"].split(',') if f.strip()}
-            enabled_dangerous = dangerous_funcs - disabled
-            if enabled_dangerous:
-                attacks.append("Some dangerous functions are enabled – test for command execution.")
 
-    # Generate configuration attack mapping.
+    # Generate configuration attack mapping
     config_mapping = generate_config_attack_mapping(config)
-    
-    # Parse registered streams.
-    streams = robust_parse_registered_streams(html)
-    stream_messages = analyze_streams(streams)
-    stream_attack_paths = generate_stream_attack_paths(streams)
 
-    # Generate exploitation suggestions.
+    # Generate exploitation suggestions
     suggestions = generate_exploitation_suggestions(config, streams, args.url)
-    extra_suggestions = generate_additional_suggestions(config, html, args.url)
-    suggestions.extend(extra_suggestions)
 
     # Generate output filenames with specified directory
     parsed_url = urlparse(args.url)
@@ -702,7 +821,18 @@ def main():
     output_filename = os.path.join(args.outdir, f"phpinfo_attack_paths_{hostname}_{timestamp}.txt")
     markdown_filename = os.path.join(args.outdir, f"phpinfo_attack_paths_{hostname}_{timestamp}.md")
 
-    print_and_save_output(config, attacks, config_mapping, stream_messages, stream_attack_paths, suggestions, output_filename, markdown_filename)
+    print_and_save_output(
+        config=config,
+        attacks=attacks,
+        config_mapping=config_mapping,
+        stream_messages=stream_messages,
+        stream_attack_paths=stream_attack_paths,
+        suggestions=suggestions,
+        output_filename=output_filename,
+        markdown_filename=markdown_filename,
+        streams=streams,
+        target_url=args.url
+    )
 
 if __name__ == '__main__':
     main()
