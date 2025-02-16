@@ -7,6 +7,11 @@ The **PHPInfo Attack Analyzer** is a **penetration testing tool** that extracts,
 - **PHPInfo Parsing**: Extracts key PHP configuration settings, OS/server details, registered streams, and file upload parameters.
 - **Attack Path Identification**: Highlights dangerous configurations (e.g., `allow_url_include`, `open_basedir` misconfigurations).
 - **Exploitation Suggestions**: Provides concrete test cases (e.g., LFI/RFI payloads, command injection examples).
+- **LFI with PHPInfo Assistance Detection**: Identifies environments vulnerable to **Local File Inclusion (LFI) leveraging phpinfo() disclosure**, based on the InsomniaSec research paper:  
+  *[LFI With PHPInfo Assistance](https://insomniasec.com/downloads/publications/LFI%20With%20PHPInfo%20Assistance.pdf)*.
+  - Confirms `file_uploads` and `upload_tmp_dir` settings.
+  - Extracts `$_FILES['dummyname']['tmp_name']` to detect temporary file exposure.
+  - Identifies temporary filename patterns for potential inclusion in LFI exploits.
 - **Dual Output**:
   - Colorized plain-text report for terminal viewing.
   - Markdown report for documentation/sharing.
